@@ -1,0 +1,17 @@
+version: '3'
+services:
+  mosquitto:
+    image: "eclipse-mosquitto"
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+  consul:
+    image: "consul"
+    ports:
+      - "8500:8500"
+    entrypoint:
+      - consul
+      - agent
+      - -dev
+      - -client=0.0.0.0
+      - -bind=0.0.0.0
