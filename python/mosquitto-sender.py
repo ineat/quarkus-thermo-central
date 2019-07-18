@@ -5,14 +5,15 @@ import random
 broker="localhost"
 port=1883
 def on_publish(client,userdata,result):
-    print(sys.argv[1] + " : Data published.")
+    print(sys.argv[1] + " : Data published")
     pass
-client= paho.Client("admin")
+client= paho.Client("admin " + sys.argv[1])
 client.on_publish = on_publish
 client.connect(broker,port)
 while (True):
-    d=random.randint(1,5)
+    d=int(sys.argv[2])
     temp=random.randint(20,35)
     time.sleep(d)
-    ret= client.publish("thermal/" + sys.argv[1], temp)
+    print(temp)
+    ret= client.publish("ilab/thermal/"+sys.argv[1], temp)
 print("Stopped...")
