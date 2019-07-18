@@ -14,20 +14,12 @@ public class ThermalResource {
 
     @Inject
     @Stream("thermal-stream")
-    Publisher<Integer> temps;
-
-
-    @GET
-    @Produces(MediaType.TEXT_PLAIN)
-    public String thermal() {
-        System.out.println("TEST");
-        return "Temp : " + temps;
-    }
+    Publisher<String> temps;
 
     @GET
     @Path("/stream")
     @Produces(MediaType.SERVER_SENT_EVENTS)
-    public Publisher<Integer> stream() {
+    public Publisher<String> stream() {
         return temps;
     }
 }

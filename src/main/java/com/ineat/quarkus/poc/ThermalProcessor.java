@@ -10,11 +10,15 @@ import org.eclipse.microprofile.reactive.streams.operators.PublisherBuilder;
 import org.eclipse.microprofile.reactive.streams.operators.ReactiveStreams;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
 import javax.inject.Provider;
 import java.util.Optional;
 
 @ApplicationScoped
 public class ThermalProcessor {
+
+    @Inject
+    MetricsService metricsService;
 
     @ConfigProperty(name = "topics", defaultValue = "Config not set")
     Provider<String> consulAuthorizedTopics;
@@ -27,32 +31,84 @@ public class ThermalProcessor {
                 .put("topic", message.getTopic())
                 .put("value", Double.valueOf(new String(message.getPayload())));
         message.ack();
-        return msg;
+        return  msg;
     }
 
+
     @Incoming("converted-message")
+    @Outgoing("filtered-message-by-area")
+    @Broadcast
+    public PublisherBuilder<JsonObject> filterByArea(JsonObject message) {
+        String[] splittedMessage = message.getString("topic").split("/");
+        String areaName = splittedMessage[0];
+        return ReactiveStreams.of(message).filter(s ->
+            Optional.ofNullable(consulAuthorizedTopics.get())
+                    .map(str -> new JsonObject(str))
+                    .filter(config -> config.containsKey(areaName))
+                    .isPresent()
+        );
+    }
+
+    @Incoming("filtered-message-by-area")
+    @Outgoing("filtered-message-by-kind")
+    @Broadcast
+    public PublisherBuilder<JsonObject> filterBykind(JsonObject message) {
+        String[] splittedMessage = message.getString("topic").split("/");
+        String areaName = splittedMessage[0];
+        String kindName = splittedMessage[1];
+        return ReactiveStreams.of(message).filter(s ->
+                Optional.ofNullable(consulAuthorizedTopics.get())
+                        .map(str -> new JsonObject(str))
+                        .map(config -> config.getJsonObject(areaName))
+                        .filter(area -> area.containsKey(kindName))
+                        .isPresent()
+        );
+    }
+
+    @Incoming("filtered-message-by-kind")
     @Outgoing("filtered-message")
     @Broadcast
-    public PublisherBuilder<Double> filterByTopic(JsonObject message) {
-        return ReactiveStreams.of(message)
-                .filter(s -> {
-                    String[] splittedMessage = message.getString("topic").split("/");
-                    String groupName = splittedMessage[0];
-                    String sensorName = splittedMessage[1];
-                    JsonObject config = new JsonObject(consulAuthorizedTopics.get());
-                    return Optional.ofNullable(config.getJsonArray(groupName))
-                            .filter(grp -> grp.contains(sensorName))
-                            .isPresent();
-                })
-                .map(msg -> message.getDouble("value"));
+    public PublisherBuilder<JsonObject> filterBySensor(JsonObject message) {
+        String[] splittedMessage = message.getString("topic").split("/");
+        String areaName = splittedMessage[0];
+        String kindName = splittedMessage[1];
+        String sensorName = splittedMessage[2];
+        return ReactiveStreams.of(message).filter(s ->
+            Optional.ofNullable(consulAuthorizedTopics.get())
+                    .map(str -> new JsonObject(str))
+                    .map(config -> config.getJsonObject(areaName))
+                    .map(area -> area.getJsonArray(kindName))
+                    .map(sensors -> sensors.contains(sensorName))
+                    .get()
+        );
     }
 
     @Incoming("filtered-message")
     @Outgoing("thermal-stream")
     @Broadcast
-    public int publishRoundedValue(Double value) {
-        int temp = (int)Math.round(value);
-        System.out.println("Receiving temp: " + temp);
-        return temp;
+    public String publishRoundedValue(JsonObject message) {
+        String[] splittedMessage = message.getString("topic").split("/");
+        String areaName = splittedMessage[0];
+        String kindName = splittedMessage[1];
+        String sensorName = splittedMessage[2];
+        int temp = (int)Math.round(message.getDouble("value"));
+        return new JsonObject()
+                .put("area", areaName)
+                .put("kind", kindName)
+                .put("sensor", sensorName)
+                .put("value", temp)
+                .toString();
+    }
+
+    @Incoming("filtered-message")
+    public void saveMetric(JsonObject message) {
+        String[] splittedMessage = message.getString("topic").split("/");
+        String kindName = splittedMessage[1];
+        String sensorName = splittedMessage[2];
+        int temp = (int)Math.round(message.getDouble("value"));
+        metricsService.add(new JsonObject()
+                .put("kind", kindName)
+                .put("sensor", sensorName)
+                .put("value", temp));
     }
 }
