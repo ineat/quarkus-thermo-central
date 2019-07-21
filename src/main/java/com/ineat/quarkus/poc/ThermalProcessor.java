@@ -102,11 +102,13 @@ public class ThermalProcessor {
 
     @Incoming("filtered-message")
     public void saveMetric(JsonObject message) {
-        String[] splittedMessage = message.getString("topic").split("/");
-        String kindName = splittedMessage[1];
-        String sensorName = splittedMessage[2];
+        String[] splittedTopic = message.getString("topic").split("/");
+        String areaName = splittedTopic[0];
+        String kindName = splittedTopic[1];
+        String sensorName = splittedTopic[2];
         int temp = (int)Math.round(message.getDouble("value"));
         metricsService.add(new JsonObject()
+                .put("area", areaName)
                 .put("kind", kindName)
                 .put("sensor", sensorName)
                 .put("value", temp));
