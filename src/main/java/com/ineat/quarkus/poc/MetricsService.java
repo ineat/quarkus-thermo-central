@@ -1,99 +1,67 @@
 package com.ineat.quarkus.poc;
 
-import com.mongodb.client.model.Filters;
-import io.netty.util.internal.StringUtil;
 import io.quarkus.mongodb.ReactiveMongoClient;
 import io.quarkus.mongodb.ReactiveMongoCollection;
 import io.vertx.core.json.JsonObject;
 import org.bson.Document;
-
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import java.text.ParseException;
+import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
 
 @ApplicationScoped
 public class MetricsService {
     @Inject
     ReactiveMongoClient mongoClient;
 
-    public CompletionStage<Void> add(JsonObject metric) {
-        SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd HH");
-
+    public CompletionStage<Void> create(JsonObject metric) {
+        SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd");
         Calendar calendar = Calendar.getInstance();
-        String minutes = String.valueOf(calendar.getTime().getMinutes());
-        Date now = calendar.getTime();
-        CompletionStage<Void> stage = null;
-        try {
-            final String timestamp = String.valueOf(formatter.parse(formatter.format(now)).getTime());
+        String date = formatter.format(calendar.getTime());
 
-            Document searchDocument = new Document()
-                    .append("timestamp_hour", timestamp)
-                    .append("area", metric.getString("area"))
-                    .append("type", metric.getString("kind"));
+        Document searchDocument = new Document()
+            .append("date", date)
+            .append("area", metric.getString("area"))
+            .append("type", metric.getString("kind"))
+            .append("sensor", metric.getString("sensor"));
 
+        CompletionStage<Void> stage = getCollection()
+            .find(searchDocument, Document.class)
+            .findFirst()
+            .run()
+            .thenAccept(maybeDoc -> {
+               if(maybeDoc.isPresent()) {
+                   Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+                   Document value = new Document()
+                           .append("val", metric.getInteger("value"))
+                           .append("timestamp", timestamp.getTime());
+                   Document foundDocument = maybeDoc.get();
+                   List<Document> values = (List<Document>)foundDocument.get("values");
+                   values.add(value);
+                   Document updateDocument = new Document("$set", new Document("values", values));
+                   getCollection().updateOne(searchDocument, updateDocument);
 
-            stage = getCollection()
-                    .find(searchDocument, Document.class)
-                    .findFirst()
-                    .run()
-                    .thenAccept(maybeDoc -> {
-                        if (maybeDoc.isPresent()) {
-                            Document foundDocument = maybeDoc.get();
-                            Document foundValues = foundDocument.get("values", Document.class);
-                            Document newDocument = new Document()
-                                    .append("timestamp_hour", timestamp)
-                                    .append("area", metric.getString("area"))
-                                    .append("type", metric.getString("kind"));
-
-                            Document newValues = cloneDocument(foundValues);
-                            Document newSensor;
-                            if (newValues.containsKey(metric.getString("sensor"))) {
-                                newSensor = newValues.get(metric.getString("sensor"), Document.class);
-                            } else {
-                                newSensor = newDocument;
-                            }
-                            newSensor.put(minutes, metric.getInteger("value"));
-                            newValues.put(metric.getString("sensor"), newSensor);
-                            newDocument.put("values", newValues);
-                            getCollection().updateOne(Filters.eq(searchDocument), newDocument);
-
-                        } else {
-                            Document metricDocument = new Document()
-                                    .append(minutes, metric.getInteger("value"));
-
-                            Document sensorDocument = new Document()
-                                    .append(metric.getString("sensor"), metricDocument);
-                            Document document = new Document()
-                                    .append("timestamp_hour", timestamp)
-                                    .append("area", metric.getString("area"))
-                                    .append("type", metric.getString("kind"))
-                                    .append("values", sensorDocument);
-                            getCollection().insertOne(document);
-                        }
-                    });
-
-        } catch (ParseException e) {
-            e.printStackTrace();
-        }
+                } else {
+                   Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+                   List<Document> values = new ArrayList<>();
+                   Document value = new Document();
+                   value.put("val", metric.getInteger("value"));
+                   value.put("timestamp", timestamp.getTime());
+                   values.add(new Document(value));
+                   Document document = new Document()
+                           .append("date", date)
+                           .append("area", metric.getString("area"))
+                           .append("type", metric.getString("kind"))
+                           .append("sensor", metric.getString("sensor"))
+                           .append("values", values);
+                   getCollection().insertOne(document);
+               }
+            });
         return stage;
-    }
-
-    private Document cloneDocument(Document base) {
-        Document newDocument = new Document();
-        for (String key : base.keySet()) {
-            if(base.get(key) instanceof Document){
-                newDocument.put(key, cloneDocument((Document)base.get(key)));
-            } else {
-                newDocument.put(key, base.get(key));
-            }
-        }
-        return newDocument;
     }
 
     private ReactiveMongoCollection<Document> getCollection(){

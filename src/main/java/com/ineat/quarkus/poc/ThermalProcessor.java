@@ -107,7 +107,7 @@ public class ThermalProcessor {
         String kindName = splittedTopic[1];
         String sensorName = splittedTopic[2];
         int temp = (int)Math.round(message.getDouble("value"));
-        metricsService.add(new JsonObject()
+        metricsService.create(new JsonObject()
                 .put("area", areaName)
                 .put("kind", kindName)
                 .put("sensor", sensorName)
