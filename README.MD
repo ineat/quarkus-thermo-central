@@ -15,12 +15,6 @@ docker run -d -p 8500:8500 consul agent -dev -client=0.0.0.0 -bind=0.0.0.0
 docker run -d -p 1883:1883 -p 9001:9001 eclipse-mosquitto
 ```
 
-### MongoDb
-
-```
-docker run -d -e MONGO_INITDB_ROOT_USERNAME="admin-user" -e MONGO_INITDB_ROOT_PASSWORD="admin-password" -e MONGO_INITDB_DATABASE="poc-quarkus-db" -v ./db/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro -p 27017:27017 mongo
-```
-
 ## Init stack automatically with Compose
 In project root launch :
 
@@ -65,4 +59,4 @@ Application can be launch with this command :
 mvn compile quarkus:dev 
 ```
 
-After it's started, go to http://localhost:8080/sensors.html to show sensors values (refresh dynamically).
+After it's started, go to http://localhost:8080/thermal/stream to show sensors values (refresh dynamically).

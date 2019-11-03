@@ -1,6 +1,6 @@
 package com.ineat.quarkus.poc;
 
-import io.smallrye.reactive.messaging.annotations.Stream;
+import io.smallrye.reactive.messaging.annotations.Channel;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Inject;
@@ -13,7 +13,7 @@ import javax.ws.rs.core.MediaType;
 public class ThermalResource {
 
     @Inject
-    @Stream("thermal-stream")
+    @Channel("thermal-stream")
     Publisher<String> temps;
 
     @GET
