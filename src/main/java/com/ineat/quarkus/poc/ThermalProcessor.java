@@ -85,8 +85,7 @@ public class ThermalProcessor {
 
     @Incoming("filtered-message")
     @Outgoing("thermal-stream")
-    @Broadcast
-    public String publishRoundedValue(JsonObject message) {
+    public String publishValue(JsonObject message) {
         String[] splittedMessage = message.getString("topic").split("/");
         String areaName = splittedMessage[0];
         String kindName = splittedMessage[1];
@@ -100,8 +99,8 @@ public class ThermalProcessor {
                 .toString();
     }
 
-    @Incoming("filtered-message")
-    public void saveMetric(JsonObject message) {
+    //@Incoming("filtered-message")
+    public void saveRoundedValue(JsonObject message) {
         String[] splittedTopic = message.getString("topic").split("/");
         String areaName = splittedTopic[0];
         String kindName = splittedTopic[1];
